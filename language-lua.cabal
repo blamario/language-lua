@@ -38,6 +38,7 @@ Library
                      Language.Lua.Syntax
                      Language.Lua.Parser
                      Language.Lua.PrettyPrinter
+                     Language.Lua.Grammar
                      Language.Lua.Annotated
                      Language.Lua.Annotated.Syntax
                      Language.Lua.Annotated.Parser
@@ -53,6 +54,10 @@ Library
                      array >= 0.4 && < 0.6,
                      bytestring >= 0.10 && < 0.11,
                      text >= 1.2 && < 1.3,
+                     grammatical-parsers < 0.2,
+                     monoid-subclasses == 0.4.*,
+                     rank2classes < 0.2,
+                     parsers < 0.13,
                      alex-tools >= 0.1.1.0 && < 0.2
 
   Build-tools:       alex, happy
@@ -94,6 +99,7 @@ Benchmark bench
                      directory,
                      filepath,
                      text,
+                     grammatical-parsers,
                      language-lua
 
   default-language:  Haskell2010
