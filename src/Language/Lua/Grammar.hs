@@ -3,7 +3,7 @@ module Language.Lua.Grammar where
 
 import Control.Applicative
 import Control.Monad (guard, void)
-import Data.Char (chr, isDigit, isHexDigit, isLetter)
+import Data.Char (chr, isAlphaNum, isDigit, isHexDigit, isLetter)
 import Data.Functor.Classes (Eq1, Show1, eq1, showsPrec1)
 import Data.Monoid ((<>))
 import Data.Monoid.Textual (TextualMonoid)
@@ -219,7 +219,7 @@ buildExpressionParser operators simpleExpr = foldl makeParser prefixExpr operato
 
 keyword :: -- (Show t, TextualMonoid t, CharParsing (p LuaGrammar t), GrammarParsing p, MonoidParsing (p LuaGrammar)) =>
            Text -> Parser LuaGrammar Text Text
-keyword k = string k <* notFollowedBy alphaNum <* ignorable
+keyword k = string k <* notSatisfyChar isAlphaNum <* ignorable
 
 symbol :: -- (Show t, TextualMonoid t, Parsing (p LuaGrammar t), GrammarParsing p, MonoidParsing (p LuaGrammar)) => 
           Text -> Parser LuaGrammar Text Text
@@ -286,7 +286,7 @@ grammar LuaGrammar{..} = LuaGrammar{
                  binary (IDiv <$ symbol "//") AssocLeft,
                  binary (Mod <$ symbol "%") AssocLeft],
                 [binary (Add <$ symbol "+") AssocLeft,
-                 binary (Sub <$ string "-" <* notFollowedBy (char '-') <* ignorable) AssocLeft], -- avoid ambiguity with comment
+                 binary (Sub <$ string "-" <* notSatisfyChar (== '-') <* ignorable) AssocLeft], -- avoid ambiguity with comment
                 [binary (Concat <$ symbol "..") AssocRight],
                 [binary (ShiftL <$ symbol "<<") AssocLeft,
                  binary (ShiftR <$ symbol ">>") AssocLeft],
@@ -347,7 +347,7 @@ grammar LuaGrammar{..} = LuaGrammar{
 
    binop =
       Add        <$ symbol "+"    <|>
-      Sub        <$ string "-" <* notFollowedBy (char '-') <* ignorable <|> 
+      Sub        <$ string "-" <* notSatisfyChar (== '-') <* ignorable <|> 
       Mul        <$ symbol "*"    <|>
       Div        <$ symbol "/"    <|>
       IDiv       <$ symbol "//"   <|>
@@ -369,7 +369,7 @@ grammar LuaGrammar{..} = LuaGrammar{
       Or         <$ keyword "or",
 
    unop =
-      Neg        <$ string "-" <* notFollowedBy (char '-') <* ignorable <|>   -- eliminate ambiguity
+      Neg        <$ string "-" <* notSatisfyChar (== '-') <* ignorable <|>   -- eliminate ambiguity
       Not        <$ keyword "not" <|>
       Len        <$ symbol "#"    <|>
       Complement <$ symbol "~",
@@ -382,7 +382,7 @@ grammar LuaGrammar{..} = LuaGrammar{
               Number FloatNum <$> (initialHexDigits <> string "." <> moptional hexDigits <> moptional hexExponent) <|>
               Number FloatNum <$> ((string "0x." <|> string "0X.") <> hexDigits <> moptional hexExponent) <|>
               Number FloatNum <$> (initialHexDigits <> hexExponent))
-             <* notFollowedBy alphaNum <* ignorable,
+             <* notSatisfyChar isAlphaNum <* ignorable,
    digits = takeCharsWhile1 isDigit,
    hexDigits = takeCharsWhile1 isHexDigit,
    initialHexDigits = (string "0x" <|> string "0X") <> hexDigits,
@@ -418,14 +418,14 @@ grammar LuaGrammar{..} = LuaGrammar{
                                            *> concatMany (escapeSequence <|>
                                                           takeCharsWhile1 (\c-> c /= '\\' && c /= quote))
                                            <* char quote
-                   in literalWith '"' <|> 
-                      literalWith '\'' <|> 
-                      longBracket
-                   <* ignorable,
+                   in (literalWith '"' <|> 
+                       literalWith '\'' <|> 
+                       longBracket)
+                      <* ignorable,
    longBracket = do void (token "[")
                     equalSigns <- takeCharsWhile (== '=')
                     void (token "[")
-                    void (token "\n") <|> notFollowedBy (token "\n")
+                    void (token "\n") <|> notSatisfyChar (== '\n')
                     let terminator = token "]" *> string equalSigns *> token "]"
                     concatMany (notFollowedBy terminator *> anyToken <> takeCharsWhile (/= ']')) <* terminator,
    comment = string "--" *> (takeCharsWhile (/= '\n') <* (void (char '\n') <|> endOfInput) <|>
