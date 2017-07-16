@@ -1,5 +1,6 @@
 module Language.Lua.Parser
-  ( A.parseText
+  ( A.Parser
+  , A.parseText
   , A.parseNamedText
   , parseFile
   , A.parseTokens
