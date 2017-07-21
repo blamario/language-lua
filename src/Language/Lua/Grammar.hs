@@ -3,20 +3,20 @@ module Language.Lua.Grammar where
 
 import Control.Applicative
 import Control.Monad (guard, void)
-import Data.Char (chr, isAlphaNum, isDigit, isHexDigit, isLetter)
+import Data.Char (isAlphaNum, isDigit, isHexDigit, isLetter)
 import Data.Functor.Classes (Eq1, Show1, eq1, showsPrec1)
 import Data.Monoid ((<>))
 import Data.Monoid.Textual (TextualMonoid)
 import qualified Data.Monoid.Textual as Textual
-import Data.Text (Text)
 import Data.Set (Set, fromList, notMember)
-import Numeric (readHex)
+import Data.String (fromString)
+import Data.Text (Text)
 
 import qualified Rank2.TH
 import Text.Grampa
 import Text.Grampa.ContextFree.LeftRecursive (Parser)
 
-import Text.Parser.Char (alphaNum, char, digit, hexDigit)
+import Text.Parser.Char (char, hexDigit, oneOf)
 import Text.Parser.Combinators (choice, count, sepBy, skipMany, try)
 import Text.Parser.Expression (Assoc(..), Operator(..))
 
@@ -397,37 +397,26 @@ grammar LuaGrammar{..} = LuaGrammar{
           <?> "name",
    literalString = let escapeSequence =
                           token "\\" 
-                          *> ("\\" <$ token "\\" <|>
-                              "\a" <$ token "a" <|>
-                              "\b" <$ token "b" <|>
-                              "\f" <$ token "f" <|>
-                              "\n" <$ token "n" <|>
-                              "\r" <$ token "r" <|>
-                              "\t" <$ token "t" <|>
-                              "\v" <$ token "v" <|>
-                              "\"" <$ token "\"" <|>
-                              "\'" <$ token "\'" <|>
-                              "\n" <$ token "\n" <|>
-                              (Textual.singleton . chr) 
-                              <$> (read <$> ((:) <$> digit <*> (Textual.toString (const "") <$> upto 2 isDigit)) <|>
-                                   token "x" *> ((fst . head . readHex) <$> count 2 hexDigit) <|>
-                                   string "u{" *> ((fst . head . readHex) <$> some hexDigit) <* token "}")
-                                <|>
-                              "" <$ token "z" <* whiteSpace)
-                       literalWith quote = char quote
-                                           *> concatMany (escapeSequence <|>
-                                                          takeCharsWhile1 (\c-> c /= '\\' && c /= quote))
-                                           <* char quote
-                   in (literalWith '"' <|> 
-                       literalWith '\'' <|> 
+                          <> (Textual.singleton <$> oneOf "\\abfnrtv\"\'\n" <|>
+                              satisfyCharInput isDigit <> upto 2 isDigit <|>
+                              token "x" <> (fromString <$> count 2 hexDigit) <|>
+                              string "u{" <> (fromString <$> some hexDigit) <> token "}" <|>
+                              token "z" <* whiteSpace)
+                       literalWith quote = token quote
+                                           <> concatMany (escapeSequence <|>
+                                                          takeWhile1 (\c-> c /= "\\" && c /= quote))
+                                           <> token quote
+                   in (literalWith "\"" <|>
+                       literalWith "\'" <|>
                        longBracket)
                       <* ignorable,
    longBracket = do void (token "[")
                     equalSigns <- takeCharsWhile (== '=')
                     void (token "[")
-                    void (token "\n") <|> notSatisfyChar (== '\n')
-                    let terminator = token "]" *> string equalSigns *> token "]"
-                    concatMany (notFollowedBy terminator *> anyToken <> takeCharsWhile (/= ']')) <* terminator,
+                    newline <- token "\n" <|> mempty <$ notSatisfyChar (== '\n')
+                    let terminator = token "]" <> string equalSigns <> token "]"
+                    (("[" <> equalSigns <> "[" <> newline) <>)
+                       <$> concatMany (notFollowedBy terminator *> anyToken <> takeCharsWhile (/= ']')) <> terminator,
    comment = string "--" *> (takeCharsWhile (/= '\n') <* (void (char '\n') <|> endOfInput) <|>
                              longBracket)
    }
