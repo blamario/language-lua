@@ -28,6 +28,7 @@ data BackendMode = EarleyMode | GrampaMode
 data Opts = Opts
     { optsInteractive :: GrammarMode
     , optsBackend     :: BackendMode
+    , optsIndex       :: Int
     , optsPretty      :: Bool
     , optsFile        :: Maybe FilePath
     } deriving Show
@@ -44,12 +45,13 @@ main = execParser opts >>= main'
     p = Opts
         <$> (mode <|> pure ExpressionMode)
         <*> (backend <|> pure GrampaMode)
+        <*> (option auto (long "index" <> help "Index of ambiguous parse" <> showDefault <> value 0 <> metavar "INT"))
         <*> switch
             ( long "pretty"
-           <> help "Pretty-print output")
+              <> help "Pretty-print output")
         <*> optional (strArgument
             ( metavar "FILE"
-           <> help "Lua file to parse"))
+              <> help "Lua file to parse"))
 
     mode :: Parser GrammarMode
     mode = ChunkMode      <$ switch (long "chunk")
@@ -76,7 +78,7 @@ main' Opts{..} =
                                of EarleyMode -> either (error . show) succeed (Parser.parseNamedText p filename contents)
                                   GrampaMode -> case getCompose (f $ parseComplete Grammar.luaGrammar contents)
                                                 of Right [x] -> succeed x
-                                                   Right l@(x:_) -> putStrLn ("Ambiguous: " ++ show (length l) ++ " parses") >> succeed x
+                                                   Right l -> putStrLn ("Ambiguous: " ++ show optsIndex ++ "/" ++ show (length l) ++ " parses") >> succeed (l !! optsIndex)
                                                    Left err -> error (show err)
     succeed x = if optsPretty
                 then putStrLn $ displayS (renderPretty 1.0 80 (pprint x)) ""

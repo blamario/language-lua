@@ -17,8 +17,8 @@ import Text.Grampa
 import Text.Grampa.ContextFree.LeftRecursive (Parser)
 
 import Text.Parser.Char (char, hexDigit, oneOf)
-import Text.Parser.Combinators (choice, count, sepBy, skipMany, try)
-import Text.Parser.Expression (Assoc(..), Operator(..))
+import Text.Parser.Combinators (count, sepBy, skipMany, try)
+import Text.Parser.Expression (Assoc(..), Operator(..), buildExpressionParser)
 
 import Language.Lua.Syntax
 
@@ -39,6 +39,8 @@ data LuaGrammar f = LuaGrammar{
    explist1 :: f [Exp],
    exp :: f Exp,
    primaryexp :: f Exp,
+   secondaryexp :: f Exp,
+   tertiaryexp :: f Exp,
    prefixexp :: f PrefixExp,
    functioncall :: f FunCall,
    args :: f FunArg,
@@ -80,6 +82,8 @@ instance Show1 f => Show (LuaGrammar f) where
       "  explist1 = " ++ showsPrec1 prec (explist1 g) "\n" ++
       "  exp = " ++ showsPrec1 prec (exp g) "\n" ++
       "  primaryexp = " ++ showsPrec1 prec (primaryexp g) "\n" ++
+      "  secondaryexp = " ++ showsPrec1 prec (secondaryexp g) "\n" ++
+      "  tertiaryexp = " ++ showsPrec1 prec (tertiaryexp g) "\n" ++
       "  prefixexp = " ++ showsPrec1 prec (prefixexp g) "\n" ++
       "  functioncall = " ++ showsPrec1 prec (functioncall g) "\n" ++
       "  args = " ++ showsPrec1 prec (args g) "\n" ++
@@ -118,6 +122,8 @@ instance Eq1 f => Eq (LuaGrammar f) where
               && eq1 (explist1 g1) (explist1 g2)
               && eq1 (exp g1) (exp g2)
               && eq1 (primaryexp g1) (primaryexp g2)
+              && eq1 (secondaryexp g1) (secondaryexp g2)
+              && eq1 (tertiaryexp g1) (tertiaryexp g2)
               && eq1 (prefixexp g1) (prefixexp g2)
               && eq1 (functioncall g1) (functioncall g2)
               && eq1 (args g1) (args g2)
@@ -154,68 +160,6 @@ sepBy1 p sep = (:) <$> p <*> many (sep *> p)
 
 upto :: (TextualMonoid s, MonoidParsing p) => Int -> (Char -> Bool) -> p s s
 upto n0 predicate = scanChars n0 (\n c-> if n > 0 && predicate c then Just (pred n) else Nothing)
-
--- | Tweaked version of 'Text.Parser.Expression.buildExpressionParser' that allows chaining prefix operators of arbitrary
--- precedence
-buildExpressionParser :: forall m g s a. (GrammarParsing m, Parsing (m g s)) =>
-                         [[Operator (m g s) a]] -> m g s a -> m g s a
-buildExpressionParser operators simpleExpr = foldl makeParser prefixExpr operators
-   where
-      prefixExpr = foldl makePrefixParser simpleExpr operators
-      makePrefixParser term ops =
-         let (_, _, _, prefix, postfix) = foldr splitOp ([],[],[],[],[]) ops
-             prefixOp   = choice prefix  <?> ""
-             postfixOp  = choice postfix <?> ""
-             termP         = (prefixFactor <|> term) <**> postfixFactor
-             prefixFactor  = foldr (.) id <$> some prefixOp <*> makeParser term ops
-             postfixFactor = foldr (flip (.)) id <$> many postfixOp
-         in termP <?> "operator"
-      makeParser term ops
-        = let (rassoc,lassoc,nassoc,_prefix,_postfix) = foldr splitOp ([],[],[],[],[]) ops
-              rassocOp   = choice rassoc
-              lassocOp   = choice lassoc
-              nassocOp   = choice nassoc
-
-              ambiguous assoc op = try (op *> empty <?> ("ambiguous use of a " ++ assoc ++ "-associative operator"))
-
-              ambiguousLeft, ambiguousNon, ambiguousRight :: m g s (x -> x)
-              ambiguousRight    = ambiguous "right" rassocOp
-              ambiguousLeft     = ambiguous "left" lassocOp
-              ambiguousNon      = ambiguous "non" nassocOp
-
-              termP = term
-
-              rassocP  = (flip <$> rassocOp <*> (termP <**> recursive rassocP1)
-                          <|> ambiguousLeft
-                          <|> ambiguousNon)
-
-              rassocP1 = rassocP <|> pure id
-
-              lassocP  = ((flip <$> lassocOp <*> termP) <**> ((.) <$> recursive lassocP1)
-                          <|> ambiguousRight
-                          <|> ambiguousNon)
-
-              lassocP1 = lassocP <|> pure id
-
-              nassocP = (flip <$> nassocOp <*> termP)
-                        <**> (ambiguousRight
-                              <|> ambiguousLeft
-                              <|> ambiguousNon
-                              <|> pure id)
-           in term <**> (rassocP <|> lassocP <|> nassocP <|> pure id) <?> "operator"
-
-
-      splitOp (Infix op assoc) (rassoc,lassoc,nassoc,prefix,postfix)
-        = case assoc of
-            AssocNone  -> (rassoc,lassoc,op:nassoc,prefix,postfix)
-            AssocLeft  -> (rassoc,op:lassoc,nassoc,prefix,postfix)
-            AssocRight -> (op:rassoc,lassoc,nassoc,prefix,postfix)
-
-      splitOp (Prefix op) (rassoc,lassoc,nassoc,prefix,postfix)
-        = (rassoc,lassoc,nassoc,op:prefix,postfix)
-
-      splitOp (Postfix op) (rassoc,lassoc,nassoc,prefix,postfix)
-        = (rassoc,lassoc,nassoc,prefix,op:postfix)
 
 keyword :: -- (Show t, TextualMonoid t, CharParsing (p LuaGrammar t), GrammarParsing p, MonoidParsing (p LuaGrammar)) =>
            Text -> Parser LuaGrammar Text Text
@@ -279,8 +223,8 @@ grammar LuaGrammar{..} = LuaGrammar{
    -- Operator precedence from 3.4.8
    exp = let binary op = Infix (Binop <$> op)
              operators = [
-                [binary (Exp <$ symbol "^") AssocRight],
-                [Prefix (Unop <$> unop)],
+--                [binary (Exp <$ symbol "^") AssocRight],
+--                [Prefix (Unop <$> unop)],
                 [binary (Mul <$ symbol "*") AssocLeft,
                  binary (Div <$ symbol "/") AssocLeft,
                  binary (IDiv <$ symbol "//") AssocLeft,
@@ -301,7 +245,11 @@ grammar LuaGrammar{..} = LuaGrammar{
                  binary (EQ <$ symbol "==") AssocLeft],
                 [binary (And <$ keyword "and") AssocLeft],
                 [binary (Or <$ keyword "or") AssocLeft]]
-         in buildExpressionParser operators primaryexp,
+         in buildExpressionParser operators tertiaryexp,
+   tertiaryexp = Unop <$> unop <*> tertiaryexp <|>
+                 secondaryexp,
+   secondaryexp = flip Binop <$> primaryexp <*> (Exp <$ symbol "^") <*> tertiaryexp <|>
+                  primaryexp,
    primaryexp =
       Nil <$ keyword "nil" <|>
       Bool <$> pure False <* keyword "false" <|>

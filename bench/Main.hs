@@ -3,7 +3,7 @@ module Main where
 import           Criterion.Main
 import           Data.Functor.Compose (getCompose)
 import           Data.Maybe          (catMaybes)
-import           Data.Text           (Text, unpack)
+import           Data.Text           (Text)
 import qualified Data.Text.IO        as Text
 import           System.Directory    (getDirectoryContents)
 import           System.FilePath
