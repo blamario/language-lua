@@ -27,7 +27,6 @@ import Prelude hiding (EQ, GT, LT, exp, exponent)
 data LuaGrammar f = LuaGrammar{
    chunk :: f Block,
    block :: f Block,
-   stats :: f [Stat],
    stat :: f Stat,
    retstat :: f [Exp],
    label :: f Name,
@@ -36,11 +35,9 @@ data LuaGrammar f = LuaGrammar{
    var :: f Var,
    namelist :: f [Name],
    explist :: f [Exp],
-   explist1 :: f [Exp],
    exp :: f Exp,
    primaryexp :: f Exp,
    secondaryexp :: f Exp,
-   tertiaryexp :: f Exp,
    prefixexp :: f PrefixExp,
    functioncall :: f FunCall,
    args :: f FunArg,
@@ -52,17 +49,7 @@ data LuaGrammar f = LuaGrammar{
    field :: f TableField,
    fieldsep :: f (),
    binop :: f Binop,
-   unop :: f Unop,
-   literalString :: f Text,
-   longBracket :: f Text,
-   comment :: f Text,
-   numeral :: f Exp,
-   name :: f Name,
-   digits :: f Text,
-   hexDigits :: f Text,
-   initialHexDigits :: f Text,
-   exponent :: f Text,
-   hexExponent :: f Text}
+   unop :: f Unop}
 
 $(Rank2.TH.deriveAll ''LuaGrammar)
 
@@ -70,7 +57,6 @@ instance Show1 f => Show (LuaGrammar f) where
    showsPrec prec g rest = "LuaGrammar{" ++
       "  chunk = " ++ showsPrec1 prec (chunk g) "\n" ++
       "  block = " ++ showsPrec1 prec (block g) "\n" ++
-      "  stats = " ++ showsPrec1 prec (stats g) "\n" ++
       "  stat = " ++ showsPrec1 prec (stat g) "\n" ++
       "  retstat = " ++ showsPrec1 prec (retstat g) "\n" ++
       "  label = " ++ showsPrec1 prec (label g) "\n" ++
@@ -79,11 +65,9 @@ instance Show1 f => Show (LuaGrammar f) where
       "  var = " ++ showsPrec1 prec (var g) "\n" ++
       "  namelist = " ++ showsPrec1 prec (namelist g) "\n" ++
       "  explist = " ++ showsPrec1 prec (explist g) "\n" ++
-      "  explist1 = " ++ showsPrec1 prec (explist1 g) "\n" ++
       "  exp = " ++ showsPrec1 prec (exp g) "\n" ++
       "  primaryexp = " ++ showsPrec1 prec (primaryexp g) "\n" ++
       "  secondaryexp = " ++ showsPrec1 prec (secondaryexp g) "\n" ++
-      "  tertiaryexp = " ++ showsPrec1 prec (tertiaryexp g) "\n" ++
       "  prefixexp = " ++ showsPrec1 prec (prefixexp g) "\n" ++
       "  functioncall = " ++ showsPrec1 prec (functioncall g) "\n" ++
       "  args = " ++ showsPrec1 prec (args g) "\n" ++
@@ -95,22 +79,11 @@ instance Show1 f => Show (LuaGrammar f) where
       "  field = " ++ showsPrec1 prec (field g) "\n" ++
       "  fieldsep = " ++ showsPrec1 prec (fieldsep g) "\n" ++
       "  binop = " ++ showsPrec1 prec (binop g) "\n" ++
-      "  unop = " ++ showsPrec1 prec (unop g) "\n" ++
-      "  literalString = " ++ showsPrec1 prec (literalString g) "\n" ++
-      "  longBracket = " ++ showsPrec1 prec (longBracket g) "\n" ++
-      "  comment = " ++ showsPrec1 prec (comment g) "\n" ++
-      "  numeral = " ++ showsPrec1 prec (numeral g) "\n" ++
-      "  name = " ++ showsPrec1 prec (name g) "\n" ++
-      "  digits = " ++ showsPrec1 prec (digits g) "\n" ++
-      "  hexDigits = " ++ showsPrec1 prec (hexDigits g) "\n" ++
-      "  initialHexDigits = " ++ showsPrec1 prec (initialHexDigits g) "\n" ++
-      "  exponent = " ++ showsPrec1 prec (exponent g) "\n" ++
-      "  hexExponent = " ++ showsPrec1 prec (hexExponent g) ("}" ++ rest)
+      "  unop = " ++ showsPrec1 prec (unop g) "\n" ++ rest
 
 instance Eq1 f => Eq (LuaGrammar f) where
    g1 == g2 = eq1 (chunk g1) (chunk g2)
               && eq1 (block g1) (block g2)
-              && eq1 (stats g1) (stats g2)
               && eq1 (stat g1) (stat g2)
               && eq1 (retstat g1) (retstat g2)
               && eq1 (label g1) (label g2)
@@ -119,11 +92,9 @@ instance Eq1 f => Eq (LuaGrammar f) where
               && eq1 (var g1) (var g2)
               && eq1 (namelist g1) (namelist g2)
               && eq1 (explist g1) (explist g2)
-              && eq1 (explist1 g1) (explist1 g2)
               && eq1 (exp g1) (exp g2)
               && eq1 (primaryexp g1) (primaryexp g2)
               && eq1 (secondaryexp g1) (secondaryexp g2)
-              && eq1 (tertiaryexp g1) (tertiaryexp g2)
               && eq1 (prefixexp g1) (prefixexp g2)
               && eq1 (functioncall g1) (functioncall g2)
               && eq1 (args g1) (args g2)
@@ -136,23 +107,9 @@ instance Eq1 f => Eq (LuaGrammar f) where
               && eq1 (fieldsep g1) (fieldsep g2)
               && eq1 (binop g1) (binop g2)
               && eq1 (unop g1) (unop g2)
-              && eq1 (literalString g1) (literalString g2)
-              && eq1 (longBracket g1) (longBracket g2)
-              && eq1 (comment g1) (comment g2)
-              && eq1 (numeral g1) (numeral g2)
-              && eq1 (name g1) (name g2)
-              && eq1 (digits g1) (digits g2)
-              && eq1 (hexDigits g1) (hexDigits g2)
-              && eq1 (initialHexDigits g1) (initialHexDigits g2)
-              && eq1 (exponent g1) (exponent g2)
-              && eq1 (hexExponent g1) (hexExponent g2)
 
 moptional :: (Monoid x, Alternative p) => p x -> p x
 moptional p = p <|> pure mempty
-
-ignorable :: -- (TextualMonoid t, Parsing (p LuaGrammar t), GrammarParsing p, MonoidParsing (p LuaGrammar)) => 
-             Parser LuaGrammar Text ()
-ignorable = whiteSpace *> skipMany (nonTerminal comment *> whiteSpace)
 
 sepBy1 :: Alternative p => p x -> p sep -> p [x]
 sepBy1 p sep = (:) <$> p <*> many (sep *> p)
@@ -160,14 +117,6 @@ sepBy1 p sep = (:) <$> p <*> many (sep *> p)
 
 upto :: (TextualMonoid s, MonoidParsing p) => Int -> (Char -> Bool) -> p s s
 upto n0 predicate = scanChars n0 (\n c-> if n > 0 && predicate c then Just (pred n) else Nothing)
-
-keyword :: -- (Show t, TextualMonoid t, CharParsing (p LuaGrammar t), GrammarParsing p, MonoidParsing (p LuaGrammar)) =>
-           Text -> Parser LuaGrammar Text Text
-keyword k = string k <* notSatisfyChar isAlphaNum <* ignorable
-
-symbol :: -- (Show t, TextualMonoid t, Parsing (p LuaGrammar t), GrammarParsing p, MonoidParsing (p LuaGrammar)) => 
-          Text -> Parser LuaGrammar Text Text
-symbol s = string s <* ignorable
 
 -- Section 3.1
 reservedKeywords  :: Set Text
@@ -185,10 +134,9 @@ grammar :: -- (Eq t, Show t, TextualMonoid t) =>
 grammar LuaGrammar{..} = LuaGrammar{
    chunk = optional (token "#" *> takeCharsWhile (/= '\n') *> (void (token "\n") <|> endOfInput))
            *> ignorable *> block <* endOfInput,
-   block = Block <$> stats <*> optional retstat,
-   stats = (:) <$> stat <*> stats <|> pure [],
+   block = Block <$> many stat <*> optional retstat,
    stat = EmptyStat <$ symbol ";" <|>
-          Assign <$> varlist <* symbol "=" <*> explist1 <|>
+          Assign <$> varlist <* symbol "=" <*> explist <|>
           FunCall <$> functioncall <|>
           Label <$> label <|>
           Break <$ keyword "break" <|>
@@ -202,13 +150,13 @@ grammar LuaGrammar{..} = LuaGrammar{
           ForRange <$ keyword "for" <*> name <* symbol "="
                    <*> exp <* symbol "," <*> exp <*> optional (symbol "," *> exp)
                    <* keyword "do" <*> block <* keyword "end" <|>
-          ForIn <$ keyword "for" <*> namelist <* keyword "in" <*> explist1 
+          ForIn <$ keyword "for" <*> namelist <* keyword "in" <*> explist 
                      <* keyword "do" <*> block <* keyword "end" <|>
           FunAssign <$ keyword "function" <*> funcname <*> funcbody <|>
           LocalFunAssign <$ keyword "local" <* keyword "function" <*> name <*> funcbody <|>
-          LocalAssign <$ keyword "local" <*> namelist <*> optional (symbol "=" *> explist1),
+          LocalAssign <$ keyword "local" <*> namelist <*> optional (symbol "=" *> explist),
 
-   retstat = keyword "return" *> explist <* optional (symbol ";"),
+   retstat = keyword "return" *> moptional explist <* optional (symbol ";"),
    label = symbol "::" *> name <* symbol "::",
    funcname = FunName <$> name <*> many (symbol "." *> name) <*> optional (symbol ":" *> name),
    varlist = sepBy1 var (symbol ","),
@@ -217,8 +165,7 @@ grammar LuaGrammar{..} = LuaGrammar{
          SelectName <$> prefixexp <* symbol "." <*> name,
    
    namelist = sepBy1 name (symbol ","),
-   explist = sepBy exp (symbol ","),
-   explist1 = sepBy1 exp (symbol ","),
+   explist = sepBy1 exp (symbol ","),
 
    -- Operator precedence from 3.4.8
    exp = let binary op = Infix (Binop <$> op)
@@ -245,10 +192,10 @@ grammar LuaGrammar{..} = LuaGrammar{
                  binary (EQ <$ symbol "==") AssocLeft],
                 [binary (And <$ keyword "and") AssocLeft],
                 [binary (Or <$ keyword "or") AssocLeft]]
-         in buildExpressionParser operators tertiaryexp,
-   tertiaryexp = Unop <$> unop <*> tertiaryexp <|>
-                 secondaryexp,
-   secondaryexp = flip Binop <$> primaryexp <*> (Exp <$ symbol "^") <*> tertiaryexp <|>
+         in buildExpressionParser operators secondaryexp,
+   secondaryexp = Unop <$> unop <*> secondaryexp <|>
+--                 primaryexp <**> (foldr (.) id <$> many (flip <$> (Binop Exp <$ symbol "^") <*> secondaryexp)),
+                  flip Binop <$> primaryexp <*> (Exp <$ symbol "^") <*> secondaryexp <|>
                   primaryexp,
    primaryexp =
       Nil <$ keyword "nil" <|>
@@ -271,9 +218,9 @@ grammar LuaGrammar{..} = LuaGrammar{
       MethodCall <$> prefixexp <* symbol ":" <*> name <*> args,
 
    args =
-      Args <$ symbol "(" <*> explist <* symbol ")" <|>
+      Args <$ symbol "(" <*> moptional explist <* symbol ")" <|>
       TableArg <$> tableconstructor <|>
-      StringArg <$> literalString ,
+      StringArg <$> literalString,
 
    functiondef = keyword "function" *> funcbody,
 
@@ -320,51 +267,55 @@ grammar LuaGrammar{..} = LuaGrammar{
       Neg        <$ string "-" <* notSatisfyChar (== '-') <* ignorable <|>   -- eliminate ambiguity
       Not        <$ keyword "not" <|>
       Len        <$ symbol "#"    <|>
-      Complement <$ symbol "~",
-
-   numeral = (Number IntNum <$> digits <|>
-              Number FloatNum <$> (digits <> string "." <> moptional digits <> moptional exponent) <|>
-              Number FloatNum <$> (string "." <> digits <> moptional exponent) <|>
-              Number FloatNum <$> (digits <> exponent) <|>
-              Number IntNum <$> initialHexDigits <|>
-              Number FloatNum <$> (initialHexDigits <> string "." <> moptional hexDigits <> moptional hexExponent) <|>
-              Number FloatNum <$> ((string "0x." <|> string "0X.") <> hexDigits <> moptional hexExponent) <|>
-              Number FloatNum <$> (initialHexDigits <> hexExponent))
-             <* notSatisfyChar isAlphaNum <* ignorable,
-   digits = takeCharsWhile1 isDigit,
-   hexDigits = takeCharsWhile1 isHexDigit,
-   initialHexDigits = (string "0x" <|> string "0X") <> hexDigits,
-   exponent = (string "e" <|> string "E") <> moptional (string "+" <|> string "-") <> digits,
-   hexExponent = (string "p" <|> string "P") <> moptional (string "+" <|> string "-") <> digits,
-   name = do let isStartChar c = isLetter c || c == '_'
-                 isNameChar c = isStartChar c || isDigit c
-             identifier <- (satisfyCharInput isStartChar <> takeCharsWhile isNameChar)
-             guard (notMember identifier reservedKeywords)
-             ignorable
-             pure (Name identifier)
-          <?> "name",
-   literalString = let escapeSequence =
-                          token "\\" 
-                          <> (Textual.singleton <$> oneOf "\\abfnrtv\"\'\n" <|>
-                              satisfyCharInput isDigit <> upto 2 isDigit <|>
-                              token "x" <> (fromString <$> count 2 hexDigit) <|>
-                              string "u{" <> (fromString <$> some hexDigit) <> token "}" <|>
-                              token "z" <* whiteSpace)
-                       literalWith quote = token quote
-                                           <> concatMany (escapeSequence <|>
-                                                          takeWhile1 (\c-> c /= "\\" && c /= quote))
-                                           <> token quote
-                   in (literalWith "\"" <|>
-                       literalWith "\'" <|>
-                       longBracket)
-                      <* ignorable,
-   longBracket = do void (token "[")
-                    equalSigns <- takeCharsWhile (== '=')
-                    void (token "[")
-                    newline <- token "\n" <|> mempty <$ notSatisfyChar (== '\n')
-                    let terminator = token "]" <> string equalSigns <> token "]"
-                    (("[" <> equalSigns <> "[" <> newline) <>)
-                       <$> concatMany (notFollowedBy terminator *> anyToken <> takeCharsWhile (/= ']')) <> terminator,
-   comment = string "--" *> (takeCharsWhile (/= '\n') <* (void (char '\n') <|> endOfInput) <|>
-                             longBracket)
+      Complement <$ symbol "~"
    }
+   where digits = takeCharsWhile1 isDigit
+         hexDigits = takeCharsWhile1 isHexDigit
+         initialHexDigits = (string "0x" <|> string "0X") <> hexDigits
+         exponent = (string "e" <|> string "E") <> moptional (string "+" <|> string "-") <> digits
+         hexExponent = (string "p" <|> string "P") <> moptional (string "+" <|> string "-") <> digits
+         numeral =
+            (Number IntNum <$> digits <* notSatisfyChar (`elem` ['.', 'e', 'E']) <|>
+             Number FloatNum <$> (digits <> string "." <> moptional digits <> moptional exponent) <|>
+             Number FloatNum <$> (string "." <> digits <> moptional exponent) <|>
+             Number FloatNum <$> (digits <> exponent) <|>
+             Number IntNum <$> initialHexDigits <* notSatisfyChar (`elem` ['.', 'p', 'P']) <|>
+             Number FloatNum <$> (initialHexDigits <> string "." <> moptional hexDigits <> moptional hexExponent) <|>
+             Number FloatNum <$> ((string "0x." <|> string "0X.") <> hexDigits <> moptional hexExponent) <|>
+             Number FloatNum <$> (initialHexDigits <> hexExponent))
+            <* notSatisfyChar isAlphaNum <* ignorable
+         literalString = let escapeSequence =
+                                token "\\" 
+                                <> (Textual.singleton <$> oneOf "\\abfnrtv\"\'\n" <|>
+                                    satisfyCharInput isDigit <> upto 2 isDigit <|>
+                                    token "x" <> (fromString <$> count 2 hexDigit) <|>
+                                    string "u{" <> (fromString <$> some hexDigit) <> token "}" <|>
+                                    token "z" <* whiteSpace)
+                             literalWith quote = token quote
+                                                 <> concatMany (escapeSequence <|>
+                                                                takeWhile1 (\c-> c /= "\\" && c /= quote))
+                                                 <> token quote
+                         in (literalWith "\"" <|>
+                             literalWith "\'" <|>
+                             longBracket)
+                            <* ignorable
+         name = do let isStartChar c = isLetter c || c == '_'
+                       isNameChar c = isStartChar c || isDigit c
+                   identifier <- (satisfyCharInput isStartChar <> takeCharsWhile isNameChar)
+                   guard (notMember identifier reservedKeywords)
+                   ignorable
+                   pure (Name identifier)
+                <?> "name"
+         longBracket = do void (token "[")
+                          equalSigns <- takeCharsWhile (== '=')
+                          void (token "[")
+                          newline <- token "\n" <|> mempty <$ notSatisfyChar (== '\n')
+                          let terminator = token "]" <> string equalSigns <> token "]"
+                          (("[" <> equalSigns <> "[" <> newline) <>)
+                             <$> concatMany (notFollowedBy terminator *> anyToken <> takeCharsWhile (/= ']')) 
+                                 <> terminator
+         comment = string "--" *> (takeCharsWhile (/= '\n') <* (void (char '\n') <|> endOfInput) <|>
+                                   longBracket)
+         ignorable = whiteSpace *> skipMany (comment *> whiteSpace)
+         keyword k = string k <* notSatisfyChar isAlphaNum <* ignorable
+         symbol s = string s <* ignorable
