@@ -6,6 +6,7 @@ import Control.Monad (guard, void)
 import Data.Char (isAlphaNum, isDigit, isHexDigit, isLetter)
 import Data.Functor.Classes (Eq1, Show1, eq1, showsPrec1)
 import Data.Monoid ((<>))
+import Data.Monoid.Null (MonoidNull)
 import Data.Monoid.Textual (TextualMonoid)
 import qualified Data.Monoid.Textual as Textual
 import Data.Set (Set, fromList, notMember)
@@ -17,7 +18,7 @@ import Text.Grampa
 import Text.Grampa.ContextFree.LeftRecursive (Parser)
 
 import Text.Parser.Char (char, hexDigit, oneOf)
-import Text.Parser.Combinators (count, sepBy, skipMany, try)
+import Text.Parser.Combinators (choice, count, skipMany, try)
 import Text.Parser.Expression (Assoc(..), Operator(..), buildExpressionParser)
 
 import Language.Lua.Syntax
@@ -47,39 +48,35 @@ data LuaGrammar f = LuaGrammar{
    tableconstructor :: f [TableField],
    fieldlist :: f [TableField],
    field :: f TableField,
-   fieldsep :: f (),
-   binop :: f Binop,
-   unop :: f Unop}
+   fieldsep :: f ()}
 
 $(Rank2.TH.deriveAll ''LuaGrammar)
 
 instance Show1 f => Show (LuaGrammar f) where
    showsPrec prec g rest = "LuaGrammar{" ++
-      "  chunk = " ++ showsPrec1 prec (chunk g) "\n" ++
-      "  block = " ++ showsPrec1 prec (block g) "\n" ++
-      "  stat = " ++ showsPrec1 prec (stat g) "\n" ++
-      "  retstat = " ++ showsPrec1 prec (retstat g) "\n" ++
-      "  label = " ++ showsPrec1 prec (label g) "\n" ++
-      "  funcname = " ++ showsPrec1 prec (funcname g) "\n" ++
-      "  varlist = " ++ showsPrec1 prec (varlist g) "\n" ++
-      "  var = " ++ showsPrec1 prec (var g) "\n" ++
-      "  namelist = " ++ showsPrec1 prec (namelist g) "\n" ++
-      "  explist = " ++ showsPrec1 prec (explist g) "\n" ++
-      "  exp = " ++ showsPrec1 prec (exp g) "\n" ++
-      "  primaryexp = " ++ showsPrec1 prec (primaryexp g) "\n" ++
-      "  secondaryexp = " ++ showsPrec1 prec (secondaryexp g) "\n" ++
-      "  prefixexp = " ++ showsPrec1 prec (prefixexp g) "\n" ++
-      "  functioncall = " ++ showsPrec1 prec (functioncall g) "\n" ++
-      "  args = " ++ showsPrec1 prec (args g) "\n" ++
-      "  functiondef = " ++ showsPrec1 prec (functiondef g) "\n" ++
-      "  funcbody = " ++ showsPrec1 prec (funcbody g) "\n" ++
-      "  parlist = " ++ showsPrec1 prec (parlist g) "\n" ++
-      "  tableconstructor = " ++ showsPrec1 prec (tableconstructor g) "\n" ++
-      "  fieldlist = " ++ showsPrec1 prec (fieldlist g) "\n" ++
-      "  field = " ++ showsPrec1 prec (field g) "\n" ++
-      "  fieldsep = " ++ showsPrec1 prec (fieldsep g) "\n" ++
-      "  binop = " ++ showsPrec1 prec (binop g) "\n" ++
-      "  unop = " ++ showsPrec1 prec (unop g) "\n" ++ rest
+      "  chunk = " ++ showsPrec1 prec (chunk g) ",\n" ++
+      "  block = " ++ showsPrec1 prec (block g) ",\n" ++
+      "  stat = " ++ showsPrec1 prec (stat g) ",\n" ++
+      "  retstat = " ++ showsPrec1 prec (retstat g) ",\n" ++
+      "  label = " ++ showsPrec1 prec (label g) ",\n" ++
+      "  funcname = " ++ showsPrec1 prec (funcname g) ",\n" ++
+      "  varlist = " ++ showsPrec1 prec (varlist g) ",\n" ++
+      "  var = " ++ showsPrec1 prec (var g) ",\n" ++
+      "  namelist = " ++ showsPrec1 prec (namelist g) ",\n" ++
+      "  explist = " ++ showsPrec1 prec (explist g) ",\n" ++
+      "  exp = " ++ showsPrec1 prec (exp g) ",\n" ++
+      "  primaryexp = " ++ showsPrec1 prec (primaryexp g) ",\n" ++
+      "  secondaryexp = " ++ showsPrec1 prec (secondaryexp g) ",\n" ++
+      "  prefixexp = " ++ showsPrec1 prec (prefixexp g) ",\n" ++
+      "  functioncall = " ++ showsPrec1 prec (functioncall g) ",\n" ++
+      "  args = " ++ showsPrec1 prec (args g) ",\n" ++
+      "  functiondef = " ++ showsPrec1 prec (functiondef g) ",\n" ++
+      "  funcbody = " ++ showsPrec1 prec (funcbody g) ",\n" ++
+      "  parlist = " ++ showsPrec1 prec (parlist g) ",\n" ++
+      "  tableconstructor = " ++ showsPrec1 prec (tableconstructor g) ",\n" ++
+      "  fieldlist = " ++ showsPrec1 prec (fieldlist g) ",\n" ++
+      "  field = " ++ showsPrec1 prec (field g) ",\n" ++
+      "  fieldsep = " ++ showsPrec1 prec (fieldsep g) ("}\n" ++ rest)
 
 instance Eq1 f => Eq (LuaGrammar f) where
    g1 == g2 = eq1 (chunk g1) (chunk g2)
@@ -105,8 +102,7 @@ instance Eq1 f => Eq (LuaGrammar f) where
               && eq1 (fieldlist g1) (fieldlist g2)
               && eq1 (field g1) (field g2)
               && eq1 (fieldsep g1) (fieldsep g2)
-              && eq1 (binop g1) (binop g2)
-              && eq1 (unop g1) (unop g2)
+
 
 moptional :: (Monoid x, Alternative p) => p x -> p x
 moptional p = p <|> pure mempty
@@ -193,10 +189,15 @@ grammar LuaGrammar{..} = LuaGrammar{
                 [binary (And <$ keyword "and") AssocLeft],
                 [binary (Or <$ keyword "or") AssocLeft]]
          in buildExpressionParser operators secondaryexp,
-   secondaryexp = Unop <$> unop <*> secondaryexp <|>
+   secondaryexp = 
+      let unop = Neg        <$ string "-" <* notSatisfyChar (== '-') <* ignorable <|>   -- eliminate ambiguity
+                 Not        <$ keyword "not" <|>
+                 Len        <$ symbol "#"    <|>
+                 Complement <$ symbol "~"
+      in Unop <$> unop <*> secondaryexp <|>
 --                 primaryexp <**> (foldr (.) id <$> many (flip <$> (Binop Exp <$ symbol "^") <*> secondaryexp)),
-                  flip Binop <$> primaryexp <*> (Exp <$ symbol "^") <*> secondaryexp <|>
-                  primaryexp,
+         flip Binop <$> primaryexp <*> (Exp <$ symbol "^") <*> secondaryexp <|>
+         primaryexp,
    primaryexp =
       Nil <$ keyword "nil" <|>
       Bool <$> pure False <* keyword "false" <|>
@@ -238,37 +239,8 @@ grammar LuaGrammar{..} = LuaGrammar{
       NamedField <$> name <* symbol "=" <*> exp <|>
       Field <$> exp,
 
-   fieldsep = void (symbol "," <|> symbol ";"),
+   fieldsep = void (symbol "," <|> symbol ";")}
 
-   binop =
-      Add        <$ symbol "+"    <|>
-      Sub        <$ string "-" <* notSatisfyChar (== '-') <* ignorable <|> 
-      Mul        <$ symbol "*"    <|>
-      Div        <$ symbol "/"    <|>
-      IDiv       <$ symbol "//"   <|>
-      Exp        <$ symbol "^"    <|>
-      Mod        <$ symbol "%"    <|>
-      BAnd       <$ symbol "&"    <|>
-      BXor       <$ symbol "~"    <|>
-      BOr        <$ symbol "|"    <|>
-      ShiftR     <$ symbol ">>"   <|>
-      ShiftL     <$ symbol "<<"   <|>
-      Concat     <$ symbol ".."   <|>
-      LT         <$ symbol "<"    <|>
-      LTE        <$ symbol "<="   <|>
-      GT         <$ symbol ">"    <|>
-      GTE        <$ symbol ">="   <|>
-      EQ         <$ symbol "=="   <|>
-      NEQ        <$ symbol "~="   <|>
-      And        <$ keyword "and" <|>
-      Or         <$ keyword "or",
-
-   unop =
-      Neg        <$ string "-" <* notSatisfyChar (== '-') <* ignorable <|>   -- eliminate ambiguity
-      Not        <$ keyword "not" <|>
-      Len        <$ symbol "#"    <|>
-      Complement <$ symbol "~"
-   }
    where digits = takeCharsWhile1 isDigit
          hexDigits = takeCharsWhile1 isHexDigit
          initialHexDigits = (string "0x" <|> string "0X") <> hexDigits
