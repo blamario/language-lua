@@ -17,10 +17,10 @@ main = do tests <- loadFiles "lua-5.3.1-tests"
           defaultMain
             [ env (loadFiles "lua-5.3.1-tests") $ \files ->
                 bench "Parsing Lua files from 5.3.1 test suite" $
-                  nf (catMaybes . map (either (const Nothing) Just) . map (P.parseText P.chunk . snd)) files,
+                  nf (catMaybes . map (either (error . show) Just) . map (P.parseText P.chunk . snd)) files,
               env (loadFiles "lua-5.3.1-tests") $ \files ->
                 bench "Grammaring Lua files from 5.3.1 test suite" $
-                  nf (catMaybes . map (either (const Nothing) Just) . map (getCompose . G.chunk . parseComplete G.luaGrammar . snd)) files,
+                  nf (catMaybes . map (either (error . show) Just) . map (getCompose . G.chunk . parseComplete G.luaGrammar . snd)) files,
              env (loadFiles "lua-5.3.1-tests") $ \files ->
                 bgroup "Grammaring individual Lua files from 5.3.1 test suite" $ []
 --                  map (\(path, content)-> bench path $ nf (either (error . show) id . getCompose . G.chunk . parseComplete G.luaGrammar) content) tests
