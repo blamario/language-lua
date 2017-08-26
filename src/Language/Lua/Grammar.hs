@@ -15,7 +15,7 @@ import Data.Text (Text)
 
 import qualified Rank2.TH
 import Text.Grampa
-import Text.Grampa.ContextFree.LeftRecursive (Parser)
+import Text.Grampa.ContextFree.LeftRecursive (Parser, longest, peg)
 
 import Text.Parser.Char (char, hexDigit, oneOf)
 import Text.Parser.Combinators (choice, count, skipMany, try)
@@ -130,7 +130,7 @@ grammar :: -- (Eq t, Show t, TextualMonoid t) =>
 grammar LuaGrammar{..} = LuaGrammar{
    chunk = optional (token "#" *> takeCharsWhile (/= '\n') *> (void (token "\n") <|> endOfInput))
            *> ignorable *> block <* endOfInput,
-   block = Block <$> many stat <*> optional retstat,
+   block = Block <$> peg (many $ longest stat) <*> optional retstat,
    stat = EmptyStat <$ symbol ";" <|>
           Assign <$> varlist <* symbol "=" <*> explist <|>
           FunCall <$> functioncall <|>
@@ -164,13 +164,13 @@ grammar LuaGrammar{..} = LuaGrammar{
    explist = sepBy1 exp (symbol ","),
 
    -- Operator precedence from 3.4.8
-   exp = let binary op = Infix (Binop <$> op)
+   exp = let binary op = Infix (Binop <$> longest op)
              operators = [
 --                [binary (Exp <$ symbol "^") AssocRight],
 --                [Prefix (Unop <$> unop)],
                 [binary (Mul <$ symbol "*") AssocLeft,
-                 binary (Div <$ symbol "/") AssocLeft,
                  binary (IDiv <$ symbol "//") AssocLeft,
+                 binary (Div <$ symbol "/") AssocLeft,
                  binary (Mod <$ symbol "%") AssocLeft],
                 [binary (Add <$ symbol "+") AssocLeft,
                  binary (Sub <$ string "-" <* notSatisfyChar (== '-') <* ignorable) AssocLeft], -- avoid ambiguity with comment
@@ -180,15 +180,15 @@ grammar LuaGrammar{..} = LuaGrammar{
                 [binary (BAnd <$ symbol "&") AssocLeft],
                 [binary (BXor <$ symbol "~") AssocLeft],
                 [binary (BOr <$ symbol "|") AssocLeft],
-                [binary (LT <$ symbol "<") AssocLeft,
-                 binary (GT <$ symbol ">") AssocLeft,
-                 binary (LTE <$ symbol "<=") AssocLeft,
+                [binary (LTE <$ symbol "<=") AssocLeft,
                  binary (GTE <$ symbol ">=") AssocLeft,
+                 binary (LT <$ symbol "<") AssocLeft,
+                 binary (GT <$ symbol ">") AssocLeft,
                  binary (NEQ <$ symbol "~=") AssocLeft,
                  binary (EQ <$ symbol "==") AssocLeft],
                 [binary (And <$ keyword "and") AssocLeft],
                 [binary (Or <$ keyword "or") AssocLeft]]
-         in buildExpressionParser operators secondaryexp,
+         in peg (buildExpressionParser operators $ longest secondaryexp),
    secondaryexp = 
       let unop = Neg        <$ string "-" <* notSatisfyChar (== '-') <* ignorable <|>   -- eliminate ambiguity
                  Not        <$ keyword "not" <|>
@@ -286,8 +286,8 @@ grammar LuaGrammar{..} = LuaGrammar{
                           (("[" <> equalSigns <> "[" <> newline) <>)
                              <$> concatMany (notFollowedBy terminator *> anyToken <> takeCharsWhile (/= ']')) 
                                  <> terminator
-         comment = string "--" *> (takeCharsWhile (/= '\n') <* (void (char '\n') <|> endOfInput) <|>
-                                   longBracket)
+         comment = string "--" *> (longBracket <|>
+                                   takeCharsWhile (/= '\n') <* (void (char '\n') <|> endOfInput))
          ignorable = whiteSpace *> skipMany (comment *> whiteSpace)
          keyword k = string k <* notSatisfyChar isAlphaNum <* ignorable
          symbol s = string s <* ignorable
