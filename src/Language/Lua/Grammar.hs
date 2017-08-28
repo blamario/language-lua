@@ -15,7 +15,7 @@ import Data.Text (Text)
 
 import qualified Rank2.TH
 import Text.Grampa
-import Text.Grampa.ContextFree.LeftRecursive (Parser, longest, peg)
+import Text.Grampa.ContextFree.LeftRecursive (Parser, longest, peg, terminalPEG)
 
 import Text.Parser.Char (char, hexDigit, oneOf)
 import Text.Parser.Combinators (choice, count, skipMany, try)
@@ -190,13 +190,13 @@ grammar LuaGrammar{..} = LuaGrammar{
                 [binary (And <$ keyword "and") AssocLeft],
                 [binary (Or <$ keyword "or") AssocLeft]]
          in peg (buildExpressionParser operators $ longest secondaryexp),
-   secondaryexp = 
-      let unop = 
-             peg $ choice $ longest <$>
-             [Neg        <$ string "-" <* notSatisfyChar (== '-') <* ignorable,   -- eliminate ambiguity
-              Not        <$ keyword "not",
-              Len        <$ symbol "#",
-              Complement <$ symbol "~"]
+   secondaryexp =
+      let unop =
+             terminalPEG $ choice
+             [Neg        <$ string "-" <* notSatisfyChar (== '-'),   -- eliminate ambiguity
+              Not        <$ string "not" <* notSatisfyChar isAlphaNum,
+              Len        <$ string "#",
+              Complement <$ string "~"] <* ignorablePEG
       in Unop <$> unop <*> secondaryexp <|>
 --                 primaryexp <**> (foldr (.) id <$> many (flip <$> (Binop Exp <$ symbol "^") <*> secondaryexp)),
          flip Binop <$> primaryexp <*> (Exp <$ symbol "^") <*> secondaryexp <|>
@@ -250,18 +250,19 @@ grammar LuaGrammar{..} = LuaGrammar{
          initialHexDigits = (string "0x" <|> string "0X") <> hexDigits
          exponent = (string "e" <|> string "E") <> moptional (string "+" <|> string "-") <> digits
          hexExponent = (string "p" <|> string "P") <> moptional (string "+" <|> string "-") <> digits
-         numeral =
-            (choice --peg $ choice $ longest <$>
-             [Number IntNum <$> digits <* notSatisfyChar (`elem` ['.', 'e', 'E', 'x', 'X']),
-              Number FloatNum <$> (digits <> string "." <> moptional digits <> moptional exponent),
-              Number FloatNum <$> (string "." <> digits <> moptional exponent),
-              Number FloatNum <$> (digits <> exponent),
-              Number IntNum <$> initialHexDigits <* notSatisfyChar (`elem` ['.', 'p', 'P']),
-              Number FloatNum <$> (initialHexDigits <> string "." <> moptional hexDigits <> moptional hexExponent),
-              Number FloatNum <$> ((string "0x." <|> string "0X.") <> hexDigits <> moptional hexExponent),
-              Number FloatNum <$> (initialHexDigits <> hexExponent)])
-            <* notSatisfyChar isAlphaNum <* ignorable
-         literalString = let escapeSequence =
+         numeral = terminalPEG $
+            choice
+            [Number IntNum <$> digits <* notSatisfyChar (`elem` ['.', 'e', 'E', 'x', 'X']),
+             Number FloatNum <$> (digits <> string "." <> moptional digits <> moptional exponent),
+             Number FloatNum <$> (string "." <> digits <> moptional exponent),
+             Number FloatNum <$> (digits <> exponent),
+             Number IntNum <$> initialHexDigits <* notSatisfyChar (`elem` ['.', 'p', 'P']),
+             Number FloatNum <$> (initialHexDigits <> string "." <> moptional hexDigits <> moptional hexExponent),
+             Number FloatNum <$> ((string "0x." <|> string "0X.") <> hexDigits <> moptional hexExponent),
+             Number FloatNum <$> (initialHexDigits <> hexExponent)]
+            <* notSatisfyChar isAlphaNum <* ignorablePEG
+         literalString = terminalPEG $
+                         let escapeSequence =
                                 token "\\" 
                                 <> choice [Textual.singleton <$> oneOf "\\abfnrtv\"\'\n",
                                            satisfyCharInput isDigit <> upto 2 isDigit,
@@ -275,13 +276,14 @@ grammar LuaGrammar{..} = LuaGrammar{
                          in (literalWith "\"" <|>
                              literalWith "\'" <|>
                              longBracket)
-                            <* ignorable
-         name = do let isStartChar c = isLetter c || c == '_'
+                            <* ignorablePEG
+         name = terminalPEG $
+                do let isStartChar c = isLetter c || c == '_'
                        isNameChar c = isStartChar c || isDigit c
                    identifier <- (satisfyCharInput isStartChar <> takeCharsWhile isNameChar)
                    guard (notMember identifier reservedKeywords)
                    pure (Name identifier)
-                <* ignorable
+                <* ignorablePEG
                 <?> "name"
          longBracket = do void (token "[")
                           equalSigns <- takeCharsWhile (== '=')
@@ -293,6 +295,7 @@ grammar LuaGrammar{..} = LuaGrammar{
                                  <> terminator
          comment = string "--" *> (longBracket <|>
                                    takeCharsWhile (/= '\n') <* (void (char '\n') <|> endOfInput))
-         ignorable = whiteSpace *> skipMany (comment *> whiteSpace)
-         keyword k = string k <* notSatisfyChar isAlphaNum <* ignorable
-         symbol s = string s <* ignorable
+         ignorable = terminalPEG ignorablePEG
+         ignorablePEG = whiteSpace *> skipMany (comment *> whiteSpace)
+         keyword k = terminalPEG (string k <* notSatisfyChar isAlphaNum <* ignorablePEG)
+         symbol s = terminalPEG (string s <* ignorablePEG)
