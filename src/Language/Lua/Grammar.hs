@@ -131,26 +131,27 @@ grammar LuaGrammar{..} = LuaGrammar{
    chunk = optional (token "#" *> takeCharsWhile (/= '\n') *> (void (token "\n") <|> endOfInput))
            *> ignorable *> block <* endOfInput,
    block = Block <$> peg (many $ longest stat) <*> optional retstat,
-   stat = EmptyStat <$ symbol ";" <|>
-          Assign <$> varlist <* symbol "=" <*> explist <|>
-          FunCall <$> functioncall <|>
-          Label <$> label <|>
-          Break <$ keyword "break" <|>
-          Goto <$ keyword "goto" <*> name <|>
-          Do <$ keyword "do" <*> block <* keyword "end" <|>
-          While <$ keyword "while" <*> exp <* keyword "do" <*> block <* keyword "end" <|>
-          Repeat <$ keyword "repeat" <*> block <* keyword "until" <*> exp <|>
-          If <$ keyword "if" <*> ((:) <$> ((,) <$> exp <* keyword "then" <*> block) 
-                                      <*> many ((,) <$ keyword "elseif" <*> exp <* keyword "then" <*> block))
-                  <*> optional (keyword "else" *> block) <* keyword "end" <|>
-          ForRange <$ keyword "for" <*> name <* symbol "="
-                   <*> exp <* symbol "," <*> exp <*> optional (symbol "," *> exp)
-                   <* keyword "do" <*> block <* keyword "end" <|>
-          ForIn <$ keyword "for" <*> namelist <* keyword "in" <*> explist 
-                     <* keyword "do" <*> block <* keyword "end" <|>
-          FunAssign <$ keyword "function" <*> funcname <*> funcbody <|>
-          LocalFunAssign <$ keyword "local" <* keyword "function" <*> name <*> funcbody <|>
-          LocalAssign <$ keyword "local" <*> namelist <*> optional (symbol "=" *> explist),
+   stat = peg $ choice $ longest <$>
+          [EmptyStat <$ symbol ";",
+           Assign <$> varlist <* symbol "=" <*> explist,
+           FunCall <$> functioncall,
+           Label <$> label,
+           Break <$ keyword "break",
+           Goto <$ keyword "goto" <*> name,
+           Do <$ keyword "do" <*> block <* keyword "end",
+           While <$ keyword "while" <*> exp <* keyword "do" <*> block <* keyword "end",
+           Repeat <$ keyword "repeat" <*> block <* keyword "until" <*> exp,
+           If <$ keyword "if" <*> ((:) <$> ((,) <$> exp <* keyword "then" <*> block) 
+                                       <*> many ((,) <$ keyword "elseif" <*> exp <* keyword "then" <*> block))
+                   <*> optional (keyword "else" *> block) <* keyword "end",
+           ForRange <$ keyword "for" <*> name <* symbol "="
+                    <*> exp <* symbol "," <*> exp <*> optional (symbol "," *> exp)
+                    <* keyword "do" <*> block <* keyword "end",
+           ForIn <$ keyword "for" <*> namelist <* keyword "in" <*> explist 
+                      <* keyword "do" <*> block <* keyword "end",
+           FunAssign <$ keyword "function" <*> funcname <*> funcbody,
+           LocalFunAssign <$ keyword "local" <* keyword "function" <*> name <*> funcbody,
+           LocalAssign <$ keyword "local" <*> namelist <*> optional (symbol "=" *> explist)],
 
    retstat = keyword "return" *> moptional explist <* optional (symbol ";"),
    label = symbol "::" *> name <* symbol "::",
@@ -190,38 +191,41 @@ grammar LuaGrammar{..} = LuaGrammar{
                 [binary (Or <$ keyword "or") AssocLeft]]
          in peg (buildExpressionParser operators $ longest secondaryexp),
    secondaryexp = 
-      let unop = Neg        <$ string "-" <* notSatisfyChar (== '-') <* ignorable <|>   -- eliminate ambiguity
-                 Not        <$ keyword "not" <|>
-                 Len        <$ symbol "#"    <|>
-                 Complement <$ symbol "~"
+      let unop = 
+             peg $ choice $ longest <$>
+             [Neg        <$ string "-" <* notSatisfyChar (== '-') <* ignorable,   -- eliminate ambiguity
+              Not        <$ keyword "not",
+              Len        <$ symbol "#",
+              Complement <$ symbol "~"]
       in Unop <$> unop <*> secondaryexp <|>
 --                 primaryexp <**> (foldr (.) id <$> many (flip <$> (Binop Exp <$ symbol "^") <*> secondaryexp)),
          flip Binop <$> primaryexp <*> (Exp <$ symbol "^") <*> secondaryexp <|>
          primaryexp,
-   primaryexp =
-      Nil <$ keyword "nil" <|>
-      Bool <$> pure False <* keyword "false" <|>
-      Bool <$> pure True <* keyword "true" <|>
-      numeral <|>
-      String <$> literalString <|>
-      Vararg <$ symbol "..." <|>
-      EFunDef <$> functiondef <|>
-      PrefixExp <$> prefixexp <* notFollowedBy (symbol "(") <|> -- fix the ambiguity from 3.3.1
-      TableConst <$> tableconstructor,
-
+   primaryexp = 
+      peg $ choice $ longest <$>
+      [Nil <$ keyword "nil",
+       Bool <$> pure False <* keyword "false",
+       Bool <$> pure True <* keyword "true",
+       numeral,
+       String <$> literalString,
+       Vararg <$ symbol "...",
+       EFunDef <$> functiondef,
+       PrefixExp <$> prefixexp <* notFollowedBy (symbol "("), -- fix the ambiguity from 3.3.1
+       TableConst <$> tableconstructor],
    prefixexp =
       PEVar <$> var <|>
       PEFunCall <$> functioncall <|>
       Paren <$ symbol "(" <*> exp <* symbol ")",
 
-   functioncall =
-      NormalFunCall <$> prefixexp <*> args <|>
-      MethodCall <$> prefixexp <* symbol ":" <*> name <*> args,
+   functioncall = peg $
+      longest (NormalFunCall <$> prefixexp <*> args) <|>
+      longest (MethodCall <$> prefixexp <* symbol ":" <*> name <*> args),
 
    args =
-      Args <$ symbol "(" <*> moptional explist <* symbol ")" <|>
-      TableArg <$> tableconstructor <|>
-      StringArg <$> literalString,
+      peg $ choice $ longest <$>
+      [Args <$ symbol "(" <*> moptional explist <* symbol ")",
+       TableArg <$> tableconstructor,
+       StringArg <$> literalString],
 
    functiondef = keyword "function" *> funcbody,
 
@@ -233,11 +237,11 @@ grammar LuaGrammar{..} = LuaGrammar{
 
    tableconstructor = symbol "{" *> fieldlist <* symbol "}",
 
-   fieldlist = sepBy1 field fieldsep <* optional fieldsep <|> pure [],
-   field =
-      ExpField <$ symbol "[" <*> exp <* symbol "]" <* symbol "=" <*> exp <|>
-      NamedField <$> name <* symbol "=" <*> exp <|>
-      Field <$> exp,
+   fieldlist = peg (sepBy1 (longest field) (longest fieldsep) <* optional (longest fieldsep) <|> pure []),
+   field = peg $
+      longest (ExpField <$ symbol "[" <*> exp <* symbol "]" <* symbol "=" <*> exp) <|>
+      longest (NamedField <$> name <* symbol "=" <*> exp) <|>
+      Field <$> longest exp,
 
    fieldsep = void (symbol "," <|> symbol ";")}
 
@@ -247,22 +251,23 @@ grammar LuaGrammar{..} = LuaGrammar{
          exponent = (string "e" <|> string "E") <> moptional (string "+" <|> string "-") <> digits
          hexExponent = (string "p" <|> string "P") <> moptional (string "+" <|> string "-") <> digits
          numeral =
-            (Number IntNum <$> digits <* notSatisfyChar (`elem` ['.', 'e', 'E']) <|>
-             Number FloatNum <$> (digits <> string "." <> moptional digits <> moptional exponent) <|>
-             Number FloatNum <$> (string "." <> digits <> moptional exponent) <|>
-             Number FloatNum <$> (digits <> exponent) <|>
-             Number IntNum <$> initialHexDigits <* notSatisfyChar (`elem` ['.', 'p', 'P']) <|>
-             Number FloatNum <$> (initialHexDigits <> string "." <> moptional hexDigits <> moptional hexExponent) <|>
-             Number FloatNum <$> ((string "0x." <|> string "0X.") <> hexDigits <> moptional hexExponent) <|>
-             Number FloatNum <$> (initialHexDigits <> hexExponent))
+            (choice --peg $ choice $ longest <$>
+             [Number IntNum <$> digits <* notSatisfyChar (`elem` ['.', 'e', 'E', 'x', 'X']),
+              Number FloatNum <$> (digits <> string "." <> moptional digits <> moptional exponent),
+              Number FloatNum <$> (string "." <> digits <> moptional exponent),
+              Number FloatNum <$> (digits <> exponent),
+              Number IntNum <$> initialHexDigits <* notSatisfyChar (`elem` ['.', 'p', 'P']),
+              Number FloatNum <$> (initialHexDigits <> string "." <> moptional hexDigits <> moptional hexExponent),
+              Number FloatNum <$> ((string "0x." <|> string "0X.") <> hexDigits <> moptional hexExponent),
+              Number FloatNum <$> (initialHexDigits <> hexExponent)])
             <* notSatisfyChar isAlphaNum <* ignorable
          literalString = let escapeSequence =
                                 token "\\" 
-                                <> (Textual.singleton <$> oneOf "\\abfnrtv\"\'\n" <|>
-                                    satisfyCharInput isDigit <> upto 2 isDigit <|>
-                                    token "x" <> (fromString <$> count 2 hexDigit) <|>
-                                    string "u{" <> (fromString <$> some hexDigit) <> token "}" <|>
-                                    token "z" <* whiteSpace)
+                                <> choice [Textual.singleton <$> oneOf "\\abfnrtv\"\'\n",
+                                           satisfyCharInput isDigit <> upto 2 isDigit,
+                                           token "x" <> (fromString <$> count 2 hexDigit),
+                                           string "u{" <> (fromString <$> some hexDigit) <> token "}",
+                                           token "z" <* whiteSpace]
                              literalWith quote = token quote
                                                  <> concatMany (escapeSequence <|>
                                                                 takeWhile1 (\c-> c /= "\\" && c /= quote))
@@ -275,8 +280,8 @@ grammar LuaGrammar{..} = LuaGrammar{
                        isNameChar c = isStartChar c || isDigit c
                    identifier <- (satisfyCharInput isStartChar <> takeCharsWhile isNameChar)
                    guard (notMember identifier reservedKeywords)
-                   ignorable
                    pure (Name identifier)
+                <* ignorable
                 <?> "name"
          longBracket = do void (token "[")
                           equalSigns <- takeCharsWhile (== '=')
