@@ -156,13 +156,13 @@ grammar LuaGrammar{..} = LuaGrammar{
    retstat = keyword "return" *> moptional explist <* optional (symbol ";"),
    label = symbol "::" *> name <* symbol "::",
    funcname = FunName <$> name <*> many (symbol "." *> name) <*> optional (symbol ":" *> name),
-   varlist = sepBy1 var (symbol ","),
+   varlist = peg (sepBy1 (longest var) (longest $ symbol ",")),
    var = VarName <$> name <|>
          Select <$> prefixexp <* symbol "[" <*> exp <* symbol "]" <|> 
          SelectName <$> prefixexp <* symbol "." <*> name,
    
-   namelist = sepBy1 name (symbol ","),
-   explist = sepBy1 exp (symbol ","),
+   namelist = peg (sepBy1 (longest name) (longest $ symbol ",")),
+   explist = peg (sepBy1 (longest exp) (longest $ symbol ",")),
 
    -- Operator precedence from 3.4.8
    exp = let binary op = Infix (Binop <$> longest op)
