@@ -3,7 +3,7 @@ module Language.Lua.Grammar where
 
 import Control.Applicative
 import Control.Monad (guard, void)
-import Data.Char (isAlphaNum, isDigit, isHexDigit, isLetter)
+import Data.Char (isAlphaNum, isDigit, isHexDigit, isLetter, isSpace)
 import Data.Functor.Classes (Eq1, Show1, eq1, showsPrec1)
 import Data.Monoid ((<>))
 import Data.Monoid.Null (MonoidNull)
@@ -14,7 +14,7 @@ import Data.String (fromString)
 import Data.Text (Text)
 
 import qualified Rank2.TH
-import Text.Grampa
+import Text.Grampa hiding (identifier, keyword)
 import Text.Grampa.ContextFree.LeftRecursive (Parser, longest, peg, terminalPEG)
 
 import Text.Parser.Char (char, hexDigit, oneOf)
@@ -128,7 +128,7 @@ luaGrammar = fixGrammar grammar
 grammar :: -- (Eq t, Show t, TextualMonoid t) =>
            GrammarBuilder LuaGrammar LuaGrammar Parser Text
 grammar LuaGrammar{..} = LuaGrammar{
-   chunk = optional (token "#" *> takeCharsWhile (/= '\n') *> (void (token "\n") <|> endOfInput))
+   chunk = optional (string "#" *> takeCharsWhile (/= '\n') *> (void (string "\n") <|> endOfInput))
            *> ignorable *> block <* endOfInput,
    block = Block <$> peg (many $ longest stat) <*> optional retstat,
    stat = peg $ choice $ longest <$>
@@ -263,16 +263,16 @@ grammar LuaGrammar{..} = LuaGrammar{
             <* notSatisfyChar isAlphaNum <* ignorablePEG
          literalString = terminalPEG $
                          let escapeSequence =
-                                token "\\" 
+                                string "\\" 
                                 <> choice [Textual.singleton <$> oneOf "\\abfnrtv\"\'\n",
                                            satisfyCharInput isDigit <> upto 2 isDigit,
-                                           token "x" <> (fromString <$> count 2 hexDigit),
-                                           string "u{" <> (fromString <$> some hexDigit) <> token "}",
-                                           token "z" <* whiteSpace]
-                             literalWith quote = token quote
+                                           string "x" <> (fromString <$> count 2 hexDigit),
+                                           string "u{" <> (fromString <$> some hexDigit) <> string "}",
+                                           string "z" <* takeCharsWhile isSpace]
+                             literalWith quote = string quote
                                                  <> concatMany (escapeSequence <|>
                                                                 takeWhile1 (\c-> c /= "\\" && c /= quote))
-                                                 <> token quote
+                                                 <> string quote
                          in (literalWith "\"" <|>
                              literalWith "\'" <|>
                              longBracket)
@@ -285,17 +285,17 @@ grammar LuaGrammar{..} = LuaGrammar{
                    pure (Name identifier)
                 <* ignorablePEG
                 <?> "name"
-         longBracket = do void (token "[")
+         longBracket = do void (string "[")
                           equalSigns <- takeCharsWhile (== '=')
-                          void (token "[")
-                          newline <- token "\n" <|> mempty <$ notSatisfyChar (== '\n')
-                          let terminator = token "]" <> string equalSigns <> token "]"
+                          void (string "[")
+                          newline <- string "\n" <|> mempty <$ notSatisfyChar (== '\n')
+                          let terminator = string "]" <> string equalSigns <> string "]"
                           (("[" <> equalSigns <> "[" <> newline) <>)
                              <$> concatMany (notFollowedBy terminator *> anyToken <> takeCharsWhile (/= ']')) 
                                  <> terminator
          comment = string "--" *> (longBracket <|>
                                    takeCharsWhile (/= '\n') <* (void (char '\n') <|> endOfInput))
          ignorable = terminalPEG ignorablePEG
-         ignorablePEG = whiteSpace *> skipMany (comment *> whiteSpace)
+         ignorablePEG = takeCharsWhile isSpace *> skipMany (comment *> takeCharsWhile isSpace)
          keyword k = terminalPEG (string k <* notSatisfyChar isAlphaNum <* ignorablePEG)
          symbol s = terminalPEG (string s <* ignorablePEG)

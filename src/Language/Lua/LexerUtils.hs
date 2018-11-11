@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Language.Lua.LexerUtils where
 
+import           Control.Monad.Fail(MonadFail(fail))
 import           Data.Text (Text)
 import qualified Data.Text as Text
 
@@ -11,6 +12,9 @@ import           Control.Applicative (Applicative(..))
 
 import           Language.Lua.Token
 import           AlexTools
+
+instance MonadFail (Action a) where
+   fail = error
 
 -- | Lua token with position information.
 data LexToken = LexToken
