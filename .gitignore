@@ -1,4 +1,5 @@
 dist
+dist-newstyle
 cabal-dev
 .*.swp
 *.o
@@ -12,3 +13,4 @@ cabal.sandbox.config
 cabal.config
 tags
 tmp/
+.ghc.environment.*

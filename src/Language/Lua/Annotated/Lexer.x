@@ -150,7 +150,7 @@ tokens :-
 lexerTools :: Input -> [Lexeme Token]
 lexerTools = $makeLexer LexerConfig
   { lexerInitialState = NormalMode
-  , lexerEOF = \_ -> []
+  , lexerEOF = \_ _ -> []
   , lexerStateMode = \mode ->
        case mode of
          NormalMode        -> 0
@@ -180,8 +180,8 @@ llexNamedWithWhiteSpace ::
   String {- ^ name -} ->
   Text   {- ^ chunk -} ->
   [Lexeme Token]
-llexNamedWithWhiteSpace _name chunk =
-   lexerTools (initialInput (dropSpecialComment chunk))
+llexNamedWithWhiteSpace name chunk =
+   lexerTools (initialInput (Text.pack name) (dropSpecialComment chunk))
 
 
 -- | Run Lua lexer on a file.
