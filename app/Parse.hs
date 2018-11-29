@@ -14,7 +14,7 @@ import Data.Text (Text)
 import Data.Text.IO (getLine, readFile)
 import Data.Typeable (Typeable)
 import Options.Applicative
-import Text.Grampa (parseComplete)
+import Text.Grampa (parseComplete, showFailure)
 import Language.Lua.PrettyPrinter (LPretty(..), displayS, renderPretty)
 
 import Prelude hiding (getLine, readFile)
@@ -79,7 +79,7 @@ main' Opts{..} =
                                   GrampaMode -> case getCompose (f $ parseComplete Grammar.luaGrammar contents)
                                                 of Right [x] -> succeed x
                                                    Right l -> putStrLn ("Ambiguous: " ++ show optsIndex ++ "/" ++ show (length l) ++ " parses") >> succeed (l !! optsIndex)
-                                                   Left err -> error (show err)
+                                                   Left err -> error (showFailure contents err 3)
     succeed x = if optsPretty
                 then putStrLn $ displayS (renderPretty 1.0 80 (pprint x)) ""
                 else print x

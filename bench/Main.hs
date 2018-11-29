@@ -7,7 +7,7 @@ import           Data.Text           (Text)
 import qualified Data.Text.IO        as Text
 import           System.Directory    (getDirectoryContents)
 import           System.FilePath
-import Text.Grampa (parseComplete)
+import Text.Grampa (parseComplete, showFailure)
 
 import qualified Language.Lua.Annotated.Parser  as P
 import qualified Language.Lua.Grammar  as G
@@ -20,7 +20,9 @@ main = do tests <- loadFiles "lua-5.3.1-tests"
                   nf (catMaybes . map (either (error . show) Just) . map (P.parseText P.chunk . snd)) files,
               env (loadFiles "lua-5.3.1-tests") $ \files ->
                 bench "Grammaring Lua files from 5.3.1 test suite" $
-                  nf (catMaybes . map (either (error . show) Just) . map (getCompose . G.chunk . parseComplete G.luaGrammar . snd)) files,
+                  nf (catMaybes . map (\(name, content)-> 
+                                        either (error . ((name ++ ":\n") ++) . flip (showFailure content) 3) Just 
+                                        $ getCompose $ G.chunk $ parseComplete G.luaGrammar content)) files,
              env (loadFiles "lua-5.3.1-tests") $ \files ->
                 bgroup "Grammaring individual Lua files from 5.3.1 test suite" $ []
 --                  map (\(path, content)-> bench path $ nf (either (error . show) id . getCompose . G.chunk . parseComplete G.luaGrammar) content) tests
