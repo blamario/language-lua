@@ -217,9 +217,9 @@ grammar LuaGrammar{..} = LuaGrammar{
       PEFunCall <$> functioncall <|>
       Paren <$ symbol "(" <*> exp <* symbol ")",
 
-   functioncall = peg $
-      longest (NormalFunCall <$> prefixexp <*> args) <|>
-      longest (MethodCall <$> prefixexp <* symbol ":" <*> name <*> args),
+   functioncall =
+      (NormalFunCall <$> prefixexp <*> args) <|>
+      (MethodCall <$> prefixexp <* symbol ":" <*> name <*> args),
 
    args =
       peg $ choice $ longest <$>
